@@ -6,6 +6,7 @@
 #include <allocator_with_fit_mode.h>
 #include <iterator>
 #include <mutex>
+#include <atomic>
 
 class allocator_sorted_list final:
     public smart_mem_resource,
@@ -17,7 +18,8 @@ private:
     
     void *_trusted_memory;
 
-    static constexpr const size_t allocator_metadata_size = sizeof(std::pmr::memory_resource *) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
+    static constexpr const size_t allocator_metadata_size = sizeof(std::atomic<size_t>) + sizeof(std::pmr::memory_resource *) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
+    // static constexpr const size_t allocator_metadata_size = sizeof(std::pmr::memory_resource *) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
 
     static constexpr const size_t block_metadata_size = sizeof(void*) + sizeof(size_t);
 
