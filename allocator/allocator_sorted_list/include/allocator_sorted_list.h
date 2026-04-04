@@ -15,13 +15,30 @@ class allocator_sorted_list final:
 {
 
 private:
+    struct block_metadata_struct {
+        struct block_metadata_struct* next_block;
+        size_t managered_mem_size;
+    };
+
+    struct allocator_metadata_struct {
+        std::atomic<size_t> ref_counter;
+        std::pmr::memory_resource* memory_resource;
+        fit_mode mode;
+        size_t managered_mem_size;
+        std::mutex mutex;
+        struct block_metadata_struct* list_head;
+
+        allocator_metadata_struct() : ref_counter(1) {}
+    };
+
+private:
     
     void *_trusted_memory;
 
-    static constexpr const size_t allocator_metadata_size = sizeof(std::atomic<size_t>) + sizeof(std::pmr::memory_resource *) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
+    static constexpr const size_t allocator_metadata_size = sizeof(allocator_metadata_struct);
     // static constexpr const size_t allocator_metadata_size = sizeof(std::pmr::memory_resource *) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
 
-    static constexpr const size_t block_metadata_size = sizeof(void*) + sizeof(size_t);
+    static constexpr const size_t block_metadata_size = sizeof(block_metadata_struct);
 
 public:
 
@@ -65,7 +82,7 @@ private:
 
     class sorted_free_iterator
     {
-        void* _free_ptr;
+        block_metadata_struct* _free_ptr;
 
     public:
 
@@ -85,7 +102,7 @@ private:
 
         size_t size() const noexcept;
 
-        void* operator*() const noexcept;
+        block_metadata_struct* operator*() const noexcept;
 
         sorted_free_iterator();
 
@@ -94,9 +111,9 @@ private:
 
     class sorted_iterator
     {
-        void* _free_ptr;
-        void* _current_ptr;
-        void* _trusted_memory;
+        block_metadata_struct* _free_ptr;
+        block_metadata_struct* _current_ptr;
+        allocator_metadata_struct* _trusted_memory;
 
     public:
 
@@ -116,7 +133,7 @@ private:
 
         size_t size() const noexcept;
 
-        void* operator*() const noexcept;
+        block_metadata_struct* operator*() const noexcept;
 
         bool occupied()const noexcept;
 
