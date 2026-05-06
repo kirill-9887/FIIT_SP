@@ -6,6 +6,7 @@
 #include <pp_allocator.h>
 #include <iterator>
 #include <mutex>
+#include <atomic>
 
 class allocator_boundary_tags final :
     public smart_mem_resource,
@@ -15,14 +16,56 @@ class allocator_boundary_tags final :
 
 private:
 
-    static constexpr const size_t allocator_metadata_size = sizeof(memory_resource*) + sizeof(allocator_with_fit_mode::fit_mode) +
-                                                            sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
+    struct block_metadata_struct {
+        size_t size_and_occupied;
+        struct block_metadata_struct* prev;
+        struct block_metadata_struct* next;
+        struct block_metadata_struct* directly_prev;
 
-    static constexpr const size_t occupied_block_metadata_size = sizeof(size_t) + sizeof(void*) + sizeof(void*) + sizeof(void*);
+        size_t size() const {
+            return size_and_occupied & ~size_t(1);
+        }
+
+        void set_size(size_t size) {
+            size_and_occupied = size & ~size_t(1) | size_and_occupied & size_t(1);
+        }
+
+        bool occupied() const {
+            return size_and_occupied & size_t(1);
+        }
+
+        void set_occupied(bool occupied) {
+            size_t occupied_bit = occupied ? size_t(1) : 0;
+            size_and_occupied = size_and_occupied & ~size_t(1) | occupied_bit;
+        }
+    };
+
+    struct allocator_metadata_struct {
+        std::mutex mutex;
+        std::atomic<size_t> ref_counter;
+        std::pmr::memory_resource* parent_allocator;
+        fit_mode mode;
+        size_t managered_mem_size;
+        struct block_metadata_struct* first_free_block;
+
+        allocator_metadata_struct() : ref_counter(1) {}
+    };
+
+    static constexpr const size_t allocator_metadata_size =
+        (sizeof(struct allocator_metadata_struct) + alignof(std::max_align_t) - 1) & ~(alignof(std::max_align_t) - 1);
+    // static constexpr const size_t allocator_metadata_size = sizeof(memory_resource*) + sizeof(allocator_with_fit_mode::fit_mode) +
+    //                                                         sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
+
+    static constexpr const size_t occupied_block_metadata_size = sizeof(block_metadata_struct);
+    // static constexpr const size_t occupied_block_metadata_size = sizeof(size_t) + sizeof(void*) + sizeof(void*) + sizeof(void*);
 
     static constexpr const size_t free_block_metadata_size = 0;
 
     void *_trusted_memory;
+
+    static size_t align_size(size_t size);
+
+    static void* pool_ptr(void* trusted);
 
 public:
     
