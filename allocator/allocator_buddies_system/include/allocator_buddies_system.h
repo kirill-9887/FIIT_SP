@@ -5,6 +5,7 @@
 #include <allocator_test_utils.h>
 #include <allocator_with_fit_mode.h>
 #include <mutex>
+#include <atomic>
 #include <cmath>
 
 namespace __detail
@@ -37,8 +38,14 @@ class allocator_buddies_system final:
 
 private:
 
+    struct free_block_metadata
+    {
+        bool occupied : 1;
+        unsigned char size : 7;
+        struct free_block_metadata* next;
+    };
 
-    struct block_metadata
+    struct occupied_block_metadata
     {
         bool occupied : 1;
         unsigned char size : 7;
@@ -50,13 +57,24 @@ private:
      * TODO: You must improve it for alignment support
      */
 
-    static constexpr const size_t allocator_metadata_size = sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(unsigned char) + sizeof(std::mutex);
+    struct allocator_metadata_struct {
+        std::mutex mutex;
+        std::atomic<size_t> ref_counter;
+        std::pmr::memory_resource* parent_allocator;
+        fit_mode mode;
+        unsigned char order;
 
-    static constexpr const size_t occupied_block_metadata_size = sizeof(block_metadata) + sizeof(void*);
+        allocator_metadata_struct() : ref_counter(1) {}
+    };
 
-    static constexpr const size_t free_block_metadata_size = sizeof(block_metadata);
+    // static constexpr const size_t allocator_metadata_size = sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(unsigned char) + sizeof(std::mutex);
+    static constexpr const size_t allocator_metadata_size = sizeof(allocator_metadata_struct);
 
-    static constexpr const size_t min_k = __detail::nearest_greater_k_of_2(occupied_block_metadata_size);
+    static constexpr const size_t occupied_block_metadata_size = sizeof(occupied_block_metadata);
+
+    static constexpr const size_t free_block_metadata_size = sizeof(free_block_metadata);
+
+    static constexpr const size_t min_k = __detail::nearest_greater_k_of_2(free_block_metadata_size);
 
 public:
 
@@ -94,6 +112,8 @@ private:
 
 
     std::vector<allocator_test_utils::block_info> get_blocks_info() const noexcept override;
+
+    void* pool_ptr() const noexcept;
 
 private:
 
