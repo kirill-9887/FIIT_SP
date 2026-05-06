@@ -22,7 +22,7 @@ private:
 
     struct allocator_metadata_struct {
         std::atomic<size_t> ref_counter;
-        std::pmr::memory_resource* memory_resource;
+        std::pmr::memory_resource* parent_allocator;
         fit_mode mode;
         size_t managered_mem_size;
         std::mutex mutex;
