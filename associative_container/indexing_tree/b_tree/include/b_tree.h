@@ -1561,6 +1561,11 @@ B_tree<tkey, tvalue, compare, t>::erase(const tkey& key)
     }
     auto next_it = it;
     ++next_it;
+    tkey next_key;
+    bool has_next = (next_it != end());
+    if (has_next) {
+        next_key = next_it->first;
+    }
 
     if (!it.is_terminate_node()) {
         btree_node* internal_node = *it._path.top().first;
@@ -1613,7 +1618,7 @@ B_tree<tkey, tvalue, compare, t>::erase(const tkey& key)
         }
     }
     --_size;
-    return next_it != end() ? find(next_it->first) : end();
+    return has_next ? find(next_key) : end();
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
