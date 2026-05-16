@@ -10,8 +10,6 @@
 #include <not_implemented.h>
 #include <initializer_list>
 
-#include <iostream>
-
 template <typename tkey, typename tvalue, comparator<tkey> compare = std::less<tkey>, std::size_t t = 5>
 class B_tree final : private compare // EBCO
 {
@@ -84,7 +82,7 @@ public:
 
     // endregion five declaration
 
-    // region help declaration
+    // region btree_balancing declaration
 
     void split(btree_node* parent, size_t index, btree_node* full_node);
 
@@ -94,7 +92,7 @@ public:
 
     void merge_nodes(btree_node* left, btree_node* right, btree_node* parent, int left_idx);
 
-    // endregion help declaration
+    // endregion btree_balancing declaration
 
     // region iterators declaration
 
@@ -657,7 +655,7 @@ bool B_tree<tkey, tvalue, compare, t>::btree_iterator::operator==(const self& ot
     if (_path.empty() || other._path.empty()) {
         return false;
     }
-    return (*_path.top().first) == (*other._path.top().first);
+    return *_path.top().first == *other._path.top().first;
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
@@ -807,7 +805,7 @@ bool B_tree<tkey, tvalue, compare, t>::btree_const_iterator::operator==(const se
     if (_path.empty() || other._path.empty()) {
         return false;
     }
-    return (*_path.top().first) == (*other._path.top().first);
+    return *_path.top().first == *other._path.top().first;
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
@@ -1558,7 +1556,6 @@ template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t
 typename B_tree<tkey, tvalue, compare, t>::btree_iterator
 B_tree<tkey, tvalue, compare, t>::erase(const tkey& key)
 {
-    std::cout << "erase(" << key << ")" << std::endl;
     auto it = find(key);
     if (it == end()) {
         return end();
@@ -1581,37 +1578,47 @@ B_tree<tkey, tvalue, compare, t>::erase(const tkey& key)
     assert(it.is_terminate_node());
     btree_node* leaf_node = *it._path.top().first;
     leaf_node->_keys.erase(leaf_node->_keys.begin() + it._index);
-
     while (it._path.size() > 1) {
-        btree_node* cur_node = *(it._path.top().first);
+        btree_node* cur_node = *it._path.top().first;
         auto cur_node_idx = it._path.top().second;
         it._path.pop();
-        btree_node* parent = *(it._path.top().first);
+        btree_node* parent = *it._path.top().first;
         if (cur_node->_keys.size() < minimum_keys_in_node) {
             if (cur_node_idx + 1 < parent->_pointers.size()) {
                 btree_node* right = parent->_pointers[cur_node_idx + 1];
                 if (right->_keys.size() > minimum_keys_in_node) {
                     left_rotation(cur_node, right, parent, cur_node_idx);
+                    continue;
                 }
-            } else if (cur_node_idx > 0) {
+            }
+            if (cur_node_idx > 0) {
                 btree_node* left = parent->_pointers[cur_node_idx - 1];
                 if (left->_keys.size() > minimum_keys_in_node) {
                     right_rotation(left, cur_node, parent, cur_node_idx);
+                    continue;
                 }
-            } else if (cur_node_idx + 1 < parent->_pointers.size()) {
+            }
+            if (cur_node_idx + 1 < parent->_pointers.size()) {
                 btree_node* right = parent->_pointers[cur_node_idx + 1];
                 merge_nodes(cur_node, right, parent, cur_node_idx);
-            } else {  // cur_node_idx > 0
+                continue;
+            }
+            if (cur_node_idx > 0) {
                 btree_node* left = parent->_pointers[cur_node_idx - 1];
                 merge_nodes(left, cur_node, parent, cur_node_idx - 1);
+                continue;
             }
         }
     }
     if (_root && _root->_keys.empty()) {
-        assert(_root->_pointers.size() == 1);
-        btree_node* old_root = _root;
-        _root = _root->_pointers[0];
-        _allocator.delete_object(old_root);
+        assert(_root->_pointers.size() <= 1);
+        if (_root->_pointers.size() == 1) {
+            btree_node* old_root = _root;
+            _root = _root->_pointers[0];
+            _allocator.delete_object(old_root);
+        } else {
+            _root = nullptr;
+        }
     }
     --_size;
     return has_next ? find(next_key) : end();
@@ -1623,7 +1630,6 @@ void B_tree<tkey, tvalue, compare, t>::left_rotation(B_tree<tkey, tvalue, compar
         B_tree<tkey, tvalue, compare, t>::btree_node* parent, int node_idx) {
     assert(node_idx + 1 < parent->_pointers.size());
     auto right_idx = node_idx + 1;
-    // auto* right = parent->_pointers[right_idx];
     assert(right->_keys.size() > minimum_keys_in_node);
     node->_keys.push_back(parent->_keys[node_idx]);
     auto right_data = right->_keys.front();
@@ -1642,7 +1648,6 @@ void B_tree<tkey, tvalue, compare, t>::right_rotation(B_tree<tkey, tvalue, compa
         B_tree<tkey, tvalue, compare, t>::btree_node* parent, int node_idx) {
     assert(node_idx > 0);
     auto left_idx = node_idx - 1;
-    // auto* left = parent->_pointers[left_idx];
     assert(left->_keys.size() > minimum_keys_in_node);
     node->_keys.insert(node->_keys.begin(), parent->_keys[left_idx]);
     auto left_data = left->_keys.back();
