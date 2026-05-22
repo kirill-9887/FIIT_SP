@@ -5,6 +5,8 @@
 #include <allocator_test_utils.h>
 #include <allocator_with_fit_mode.h>
 #include <mutex>
+#include <atomic>
+#include <cassert>
 
 class allocator_red_black_tree final:
     public smart_mem_resource,
@@ -13,7 +15,6 @@ class allocator_red_black_tree final:
 {
 
 private:
-
     enum class block_color : unsigned char
     { RED, BLACK };
 
@@ -25,9 +26,57 @@ private:
 
     void *_trusted_memory;
 
-    static constexpr const size_t allocator_metadata_size = sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
-    static constexpr const size_t occupied_block_metadata_size = sizeof(block_data) + 3 * sizeof(void*);
-    static constexpr const size_t free_block_metadata_size = sizeof(block_data) + 5 * sizeof(void*);
+    struct list_block : block_data
+    {
+        list_block* prev;
+        list_block* next;
+    };
+
+    struct occupied_block_metadata_struct : list_block
+    {
+        // void* ptr_3;
+    };
+    
+    struct free_block_metadata_struct : list_block
+    {
+        free_block_metadata_struct* parent;
+        free_block_metadata_struct* left;
+        free_block_metadata_struct* right;
+
+        bool is_left_child() const {
+            if (!parent) {
+                assert(false && "parent == nullptr.");
+            }
+            return this == parent->left;
+        }
+
+        bool is_right_child() const {
+            if (!parent) {
+                assert(false && "parent == nullptr.");
+            }
+            return this == parent->right;
+        }
+    };
+
+    struct allocator_metadata_struct
+    {
+        std::mutex mutex;
+        std::atomic<size_t> ref_counter;
+        allocator_dbg_helper* alloc_dbg_helper_ptr = nullptr;
+        std::pmr::memory_resource* parent_allocator = nullptr;
+        fit_mode mode;
+        size_t pool_size = 0;
+        free_block_metadata_struct* root = nullptr;
+    };
+
+    // static constexpr const size_t allocator_metadata_size = sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
+    static constexpr const size_t allocator_metadata_size = sizeof(allocator_metadata_struct);
+
+    // static constexpr const size_t occupied_block_metadata_size = sizeof(block_data) + 3 * sizeof(void*);
+    static constexpr const size_t occupied_block_metadata_size = sizeof(occupied_block_metadata_struct);
+
+    // static constexpr const size_t free_block_metadata_size = sizeof(block_data) + 5 * sizeof(void*);
+    static constexpr const size_t free_block_metadata_size = sizeof(free_block_metadata_struct);
 
 public:
     
@@ -66,14 +115,33 @@ private:
     
     inline void set_fit_mode(allocator_with_fit_mode::fit_mode mode) override;
 
+    static void* pool_ptr(void* trusted);
+
+    static size_t block_size(void* trusted, void* block_ptr);
+
+    static struct list_block* get_head(void* trusted);
+
+    void transpant(free_block_metadata_struct* node, free_block_metadata_struct* child);
+
+    void rotate_left(free_block_metadata_struct* x);
+
+    void rotate_right(free_block_metadata_struct* y);
+
+    void insert_in_red_black_tree(free_block_metadata_struct* node);
+
+    void remove_from_red_black_tree(free_block_metadata_struct* node);
+    
+public:
+    void dump_allocator_state();
+
 private:
 
     std::vector<allocator_test_utils::block_info> get_blocks_info_inner() const override;
 
     class rb_iterator
     {
-        void* _block_ptr;
         void* _trusted;
+        list_block* _block_ptr;
 
     public:
 
@@ -95,7 +163,7 @@ private:
 
         void* operator*() const noexcept;
 
-        bool occupied()const noexcept;
+        bool occupied() const noexcept;
 
         rb_iterator();
 
