@@ -540,7 +540,7 @@ typename B_tree<tkey, tvalue, compare, t>::btree_iterator::reference
 B_tree<tkey, tvalue, compare, t>::btree_iterator::operator*() const noexcept
 {
     btree_node* current_node = *_path.top().first;
-    return reinterpret_cast<reference>(current_node->_keys[_index]);
+    return reinterpret_cast<reference&>(current_node->_keys[_index]);
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
@@ -646,16 +646,13 @@ B_tree<tkey, tvalue, compare, t>::btree_iterator::operator--(int)
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
 bool B_tree<tkey, tvalue, compare, t>::btree_iterator::operator==(const self& other) const noexcept
 {
-    if (_index != other._index) {
-        return false;
-    }
     if (_path.empty() && other._path.empty()) {
         return true;
     }
     if (_path.empty() || other._path.empty()) {
         return false;
     }
-    return *_path.top().first == *other._path.top().first;
+    return *_path.top().first == *other._path.top().first && _index == other._index;
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
@@ -792,16 +789,13 @@ B_tree<tkey, tvalue, compare, t>::btree_const_iterator::operator--(int)
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
 bool B_tree<tkey, tvalue, compare, t>::btree_const_iterator::operator==(const self& other) const noexcept
 {
-    if (_index != other._index) {
-        return false;
-    }
     if (_path.empty() && other._path.empty()) {
         return true;
     }
     if (_path.empty() || other._path.empty()) {
         return false;
     }
-    return *_path.top().first == *other._path.top().first;
+    return *_path.top().first == *other._path.top().first && _index == other._index;
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
@@ -1433,8 +1427,11 @@ B_tree<tkey, tvalue, compare, t>::emplace(Args&&... args)
         i = r_it._index + 1;
         path = r_it._path;
     } else if (it->first == data.first) {
-        // (*it._path.top().first)->_keys[it._index].second = data.second;
-        return std::make_pair(it, false);
+        if (it->second == data.second) {
+            return std::make_pair(it, false);
+        }
+        (*it._path.top().first)->_keys[it._index].second = data.second;
+        return std::make_pair(it, true);
     } else {
         current_ptr = it._path.top().first;
         if ((*current_ptr)->is_internal()) {
@@ -1473,14 +1470,12 @@ void B_tree<tkey, tvalue, compare, t>::split(btree_node* parent, size_t index, b
 {
     btree_node* new_node = _allocator.template new_object<btree_node>();
     parent->_keys.insert(parent->_keys.begin() + index, std::move(full_node->_keys[t]));
-    for (size_t j = t + 1; j < full_node->_keys.size(); ++j) {
-        new_node->_keys.push_back(std::move(full_node->_keys[j]));
-    }
+    new_node->_keys.assign(
+        std::make_move_iterator(full_node->_keys.begin() + t + 1),
+        std::make_move_iterator(full_node->_keys.end()));
     full_node->_keys.erase(full_node->_keys.begin() + t, full_node->_keys.end());
     if (full_node->is_internal()) {
-        for (size_t j = t + 1; j < full_node->_pointers.size(); ++j) {
-            new_node->_pointers.push_back(full_node->_pointers[j]);
-        }
+        new_node->_pointers.assign(full_node->_pointers.begin() + t + 1, full_node->_pointers.end());
         full_node->_pointers.erase(full_node->_pointers.begin() + t + 1, full_node->_pointers.end());
     }
     parent->_pointers.insert(parent->_pointers.begin() + index + 1, new_node);
@@ -1591,7 +1586,7 @@ B_tree<tkey, tvalue, compare, t>::erase(const tkey& key)
             if (cur_node_idx > 0) {
                 btree_node* left = parent->_pointers[cur_node_idx - 1];
                 if (left->_keys.size() > minimum_keys_in_node) {
-                    right_rotation(left, cur_node, parent, cur_node_idx);
+                    right_rotation(left, cur_node, parent, cur_node_idx - 1);
                     continue;
                 }
             }
@@ -1622,52 +1617,43 @@ B_tree<tkey, tvalue, compare, t>::erase(const tkey& key)
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void B_tree<tkey, tvalue, compare, t>::left_rotation(B_tree<tkey, tvalue, compare, t>::btree_node* node, 
-        B_tree<tkey, tvalue, compare, t>::btree_node* right, 
-        B_tree<tkey, tvalue, compare, t>::btree_node* parent, int node_idx) {
-    assert(node_idx + 1 < parent->_pointers.size());
-    auto right_idx = node_idx + 1;
-    assert(right->_keys.size() > minimum_keys_in_node);
-    node->_keys.push_back(parent->_keys[node_idx]);
-    auto right_data = right->_keys.front();
+void B_tree<tkey, tvalue, compare, t>::left_rotation(btree_node* left, 
+    btree_node* right, btree_node* parent, int left_idx)
+{
+    left->_keys.push_back(std::move(parent->_keys[left_idx]));
+    parent->_keys[left_idx] = std::move(right->_keys.front());
     right->_keys.erase(right->_keys.begin());
-    parent->_keys[node_idx] = right_data;
-    if (right->_pointers.size() > 0) {
-        auto* pointer = right->_pointers.front();
+    if (right->is_internal()) {
+        left->_pointers.push_back(right->_pointers.front());
         right->_pointers.erase(right->_pointers.begin());
-        node->_pointers.push_back(pointer);
     }
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void B_tree<tkey, tvalue, compare, t>::right_rotation(B_tree<tkey, tvalue, compare, t>::btree_node* left,
-        B_tree<tkey, tvalue, compare, t>::btree_node* node,
-        B_tree<tkey, tvalue, compare, t>::btree_node* parent, int node_idx) {
-    assert(node_idx > 0);
-    auto left_idx = node_idx - 1;
-    assert(left->_keys.size() > minimum_keys_in_node);
-    node->_keys.insert(node->_keys.begin(), parent->_keys[left_idx]);
-    auto left_data = left->_keys.back();
+void B_tree<tkey, tvalue, compare, t>::right_rotation(btree_node* left,
+    btree_node* right, btree_node* parent, int left_idx)
+{
+    right->_keys.insert(right->_keys.begin(), std::move(parent->_keys[left_idx]));
+    parent->_keys[left_idx] = std::move(left->_keys.back());
     left->_keys.pop_back();
-    parent->_keys[left_idx] = left_data;
-    if (left->_pointers.size() > 0) {
-        auto* pointer = left->_pointers.back();
+    if (left->is_internal()) {
+        right->_pointers.insert(right->_pointers.begin(), left->_pointers.back());
         left->_pointers.pop_back();
-        node->_pointers.insert(node->_pointers.begin(), pointer);
     }
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void B_tree<tkey, tvalue, compare, t>::merge_nodes(B_tree<tkey, tvalue, compare, t>::btree_node* left,
-        B_tree<tkey, tvalue, compare, t>::btree_node* right,
-        B_tree<tkey, tvalue, compare, t>::btree_node* parent, int left_idx) {
-    assert(left->_keys.size() + 1 + right->_keys.size() <= maximum_keys_in_node);
-    left->_keys.push_back(parent->_keys[left_idx]);
-    left->_keys.insert(left->_keys.end(), right->_keys.begin(), right->_keys.end());
+void B_tree<tkey, tvalue, compare, t>::merge_nodes(btree_node* left,
+    btree_node* right, btree_node* parent, int left_idx)
+{
+    left->_keys.push_back(std::move(parent->_keys[left_idx]));
+    left->_keys.insert(left->_keys.end(),
+        std::make_move_iterator(right->_keys.begin()),
+        std::make_move_iterator(right->_keys.end()));
     left->_pointers.insert(left->_pointers.end(), right->_pointers.begin(), right->_pointers.end());
-    _allocator.delete_object(right);
     parent->_keys.erase(parent->_keys.begin() + left_idx);
     parent->_pointers.erase(parent->_pointers.begin() + left_idx + 1);
+    _allocator.delete_object(right);
 }
 
 // endregion modifiers implementation
