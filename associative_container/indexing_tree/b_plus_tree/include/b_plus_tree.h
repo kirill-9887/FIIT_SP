@@ -864,12 +864,13 @@ std::pair<typename BP_tree<tkey, tvalue, compare, t>::bptree_iterator, bool> BP_
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BP_tree<tkey, tvalue, compare, t>::split_term(bptree_node_middle* parent, size_t index, bptree_node_term* full_node)
+void BP_tree<tkey, tvalue, compare, t>::split_term(bptree_node_middle* parent,
+    size_t index, bptree_node_term* full_node)
 {
     bptree_node_term* new_node = _allocator.template new_object<bptree_node_term>();
-    for (size_t j = t; j < full_node->_data.size(); ++j) {
-        new_node->_data.push_back(std::move(full_node->_data[j]));
-    }
+    new_node->_data.assign(
+        std::make_move_iterator(full_node->_data.begin() + t),
+        std::make_move_iterator(full_node->_data.end()));
     parent->_keys.insert(parent->_keys.begin() + index, new_node->_data[0].first);
     parent->_pointers.insert(parent->_pointers.begin() + index + 1, new_node);
     full_node->_data.erase(full_node->_data.begin() + t, full_node->_data.end());
@@ -878,17 +879,16 @@ void BP_tree<tkey, tvalue, compare, t>::split_term(bptree_node_middle* parent, s
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BP_tree<tkey, tvalue, compare, t>::split_middle(bptree_node_middle* parent, size_t index, bptree_node_middle* full_node)
+void BP_tree<tkey, tvalue, compare, t>::split_middle(bptree_node_middle* parent,
+    size_t index, bptree_node_middle* full_node)
 {
     bptree_node_middle* new_node = _allocator.template new_object<bptree_node_middle>();
     parent->_keys.insert(parent->_keys.begin() + index, std::move(full_node->_keys[t]));
-    for (size_t j = t + 1; j < full_node->_keys.size(); ++j) {
-        new_node->_keys.push_back(std::move(full_node->_keys[j]));
-    }
+    new_node->_keys.assign(
+        std::make_move_iterator(full_node->_keys.begin() + t + 1),
+        std::make_move_iterator(full_node->_keys.end()));
     full_node->_keys.erase(full_node->_keys.begin() + t, full_node->_keys.end());
-    for (size_t j = t + 1; j < full_node->_pointers.size(); ++j) {
-        new_node->_pointers.push_back(full_node->_pointers[j]);
-    }
+    new_node->_pointers.assign(full_node->_pointers.begin() + t + 1, full_node->_pointers.end());
     full_node->_pointers.erase(full_node->_pointers.begin() + t + 1, full_node->_pointers.end());
     parent->_pointers.insert(parent->_pointers.begin() + index + 1, new_node);
 }
@@ -1065,21 +1065,19 @@ typename BP_tree<tkey, tvalue, compare, t>::bptree_iterator BP_tree<tkey, tvalue
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BP_tree<tkey, tvalue, compare, t>::left_rotation_term(BP_tree<tkey, tvalue, compare, t>::bptree_node_term* node, 
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_term* right, 
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* parent, int node_idx) {
+void BP_tree<tkey, tvalue, compare, t>::left_rotation_term(bptree_node_term* node, 
+        bptree_node_term* right, bptree_node_middle* parent, int node_idx) {
     assert(right->_data.size() > minimum_keys_in_node);
-    node->_data.push_back(right->_data[0]);
+    node->_data.push_back(std::move(right->_data[0]));
     right->_data.erase(right->_data.begin());
     parent->_keys[node_idx] = right->_data[0].first;
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BP_tree<tkey, tvalue, compare, t>::right_rotation_term(BP_tree<tkey, tvalue, compare, t>::bptree_node_term* left,
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_term* node,
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* parent, int node_idx) {
+void BP_tree<tkey, tvalue, compare, t>::right_rotation_term(bptree_node_term* left,
+        bptree_node_term* node, bptree_node_middle* parent, int node_idx) {
     assert(left->_data.size() > minimum_keys_in_node);
-    node->_data.insert(node->_data.begin(), left->_data.back());
+    node->_data.insert(node->_data.begin(), std::move(left->_data.back()));
     left->_data.pop_back();
     assert(node_idx > 0);
     auto left_idx = node_idx - 1;
@@ -1087,45 +1085,46 @@ void BP_tree<tkey, tvalue, compare, t>::right_rotation_term(BP_tree<tkey, tvalue
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BP_tree<tkey, tvalue, compare, t>::left_rotation_middle(BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* node, 
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* right, 
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* parent, int node_idx) {
-    node->_keys.push_back(right->_keys[0]);
+void BP_tree<tkey, tvalue, compare, t>::left_rotation_middle(bptree_node_middle* left,
+        bptree_node_middle* right, bptree_node_middle* parent, int left_idx) {
+    left->_keys.push_back(std::move(parent->_keys[left_idx]));
+    parent->_keys[left_idx] = std::move(right->_keys[0]);
     right->_keys.erase(right->_keys.begin());
-    parent->_keys[node_idx] = right->_keys[0];
-    node->_pointers.push_back(right->_pointers[0]);
+    left->_pointers.push_back(right->_pointers[0]);
     right->_pointers.erase(right->_pointers.begin());
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BP_tree<tkey, tvalue, compare, t>::right_rotation_middle(BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* left,
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* node,
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* parent, int node_idx) {
-    node->_keys.insert(node->_keys.begin(), left->_keys.back());
+void BP_tree<tkey, tvalue, compare, t>::right_rotation_middle(bptree_node_middle* left,
+        bptree_node_middle* right,bptree_node_middle* parent, int right_idx) {
+    right->_keys.insert(right->_keys.begin(), std::move(parent->_keys[right_idx - 1]));
+    parent->_keys[right_idx - 1] = std::move(left->_keys.back());
     left->_keys.pop_back();
-    parent->_keys[node_idx - 1] = node->_keys[0];
-    node->_pointers.insert(node->_pointers.begin(), left->_pointers.back());
+    right->_pointers.insert(right->_pointers.begin(), left->_pointers.back());
     left->_pointers.pop_back();
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BP_tree<tkey, tvalue, compare, t>::merge_nodes_term(BP_tree<tkey, tvalue, compare, t>::bptree_node_term* left,
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_term* right,
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* parent, int left_idx) {
+void BP_tree<tkey, tvalue, compare, t>::merge_nodes_term(bptree_node_term* left,
+        bptree_node_term* right, bptree_node_middle* parent, int left_idx) {
     assert(left->_data.size() + right->_data.size() <= maximum_keys_in_node);
-    left->_data.insert(left->_data.end(), right->_data.begin(), right->_data.end());
+    left->_data.insert(left->_data.end(),
+        std::make_move_iterator(right->_data.begin()),
+        std::make_move_iterator(right->_data.end()));
+    left->_next = right->_next;
     _allocator.delete_object(right);
     parent->_keys.erase(parent->_keys.begin() + left_idx);
     parent->_pointers.erase(parent->_pointers.begin() + left_idx + 1);
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BP_tree<tkey, tvalue, compare, t>::merge_nodes_middle(BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* left,
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* right,
-        BP_tree<tkey, tvalue, compare, t>::bptree_node_middle* parent, int left_idx) {
+void BP_tree<tkey, tvalue, compare, t>::merge_nodes_middle(bptree_node_middle* left,
+        bptree_node_middle* right, bptree_node_middle* parent, int left_idx) {
     assert(left->_keys.size() + 1 + right->_keys.size() <= maximum_keys_in_node);
-    left->_keys.push_back(parent->_keys[left_idx]);
-    left->_keys.insert(left->_keys.end(), right->_keys.begin(), right->_keys.end());
+    left->_keys.push_back(std::move(parent->_keys[left_idx]));
+    left->_keys.insert(left->_keys.end(),
+        std::make_move_iterator(right->_keys.begin()),
+        std::make_move_iterator(right->_keys.end()));
     left->_pointers.insert(left->_pointers.end(), right->_pointers.begin(), right->_pointers.end());
     _allocator.delete_object(right);
     parent->_keys.erase(parent->_keys.begin() + left_idx);
