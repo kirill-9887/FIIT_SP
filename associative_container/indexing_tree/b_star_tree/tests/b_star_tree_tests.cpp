@@ -112,15 +112,24 @@ TEST(bTreePositiveTests, test_split_root_with_t_equal_2)
             };
 
     BS_tree<int, std::string, std::less<int>, 2> tree(std::less<int>(), nullptr);
-
+    
+    tree.print_bstree();
     tree.emplace(1, std::string("a"));
+    tree.print_bstree();
     tree.emplace(2, std::string("b"));
+    tree.print_bstree();
     tree.emplace(15, std::string("c"));
+    tree.print_bstree();
     tree.emplace(3, std::string("d"));
+    tree.print_bstree();
     tree.emplace(4, std::string("e"));
+    tree.print_bstree();
     tree.emplace(27, std::string("f"));
+    tree.print_bstree();
     tree.emplace(-10, std::string("g"));
+    tree.print_bstree();
     tree.emplace(0, std::string("h"));
+    tree.print_bstree();
 
     EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
 }
@@ -146,18 +155,31 @@ TEST(bTreePositiveTests, test_split_root_with_t_equal_3)
 
     BS_tree<int, std::string, std::less<int>, 3> tree(std::less<int>(), nullptr);
 
+    tree.print_bstree();
     tree.emplace(1, std::string("a"));
+    tree.print_bstree();
     tree.emplace(2, std::string("b"));
+    tree.print_bstree();
     tree.emplace(15, std::string("c"));
+    tree.print_bstree();
     tree.emplace(3, std::string("d"));
+    tree.print_bstree();
     tree.emplace(4, std::string("e"));
+    tree.print_bstree();
     tree.emplace(100, std::string("f"));
+    tree.print_bstree();
     tree.emplace(24, std::string("g"));
+    tree.print_bstree();
     tree.emplace(456, std::string("h"));
+    tree.print_bstree();
     tree.emplace(101, std::string("j"));
+    tree.print_bstree();
     tree.emplace(45, std::string("k"));
+    tree.print_bstree();
     tree.emplace(193, std::string("l"));
+    tree.print_bstree();
     tree.emplace(534, std::string("m"));
+    tree.print_bstree();
 
     EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
 }

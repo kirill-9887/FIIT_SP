@@ -24,7 +24,7 @@ public:
 private:
 
     static constexpr const size_t minimum_keys_in_node = 2 * t - 1;
-    static constexpr const size_t maximum_keys_in_node = 3 * t - 2;
+    static constexpr const size_t maximum_keys_in_node = 3 * t - 1;
 
     // region comparators declaration
 
@@ -370,8 +370,6 @@ public:
     void merge_2to1(bstree_node* left, bstree_node* right, bstree_node* parent, int left_idx);
     
     void merge_3to2(bstree_node* left, bstree_node* middle, bstree_node* right, bstree_node* parent, int left_idx);
-
-    void redistribute_2to2(bstree_node* left, bstree_node* right, bstree_node* parent, int left_idx);
 
     // endregion bstree_balancing declaration
 
@@ -1428,7 +1426,6 @@ std::pair<typename BS_tree<tkey, tvalue, compare, t>::bstree_iterator, bool> BS_
         if (idx_in_parent > 0) {
             auto* left = parent->_pointers[idx_in_parent - 1];
             if (left->_keys.size() < maximum_keys_in_node) {
-                // redistribute_2to2(left, cur_node, parent, idx_in_parent - 1);
                 rotate_left(left, cur_node, parent, idx_in_parent - 1);
                 continue;
             }
@@ -1436,7 +1433,6 @@ std::pair<typename BS_tree<tkey, tvalue, compare, t>::bstree_iterator, bool> BS_
         if (idx_in_parent + 1 < parent->_pointers.size()) {
             auto* right = parent->_pointers[idx_in_parent + 1];
             if (right->_keys.size() < maximum_keys_in_node) {
-                // redistribute_2to2(cur_node, right, parent, idx_in_parent);
                 rotate_right(cur_node, right, parent, idx_in_parent);
                 continue;
             }
@@ -1536,21 +1532,6 @@ void BS_tree<tkey, tvalue, compare, t>::rotate_right(bstree_node* left, bstree_n
 }
 
 template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
-void BS_tree<tkey, tvalue, compare, t>::redistribute_2to2(bstree_node* left, bstree_node* right,
-    bstree_node* parent, int left_idx)
-{
-    auto total = left->_keys.size() + right->_keys.size();
-    auto s1 = total / 2;
-    auto s2 = total - s1;
-    while (left->_keys.size() > s1) {
-        rotate_right(left, right, parent, left_idx);
-    }
-    while (left->_keys.size() < s1) {
-        rotate_left(left, right, parent, left_idx);
-    }
-}
-
-template<typename tkey, typename tvalue, comparator<tkey> compare, std::size_t t>
 typename BS_tree<tkey, tvalue, compare, t>::bstree_iterator BS_tree<tkey, tvalue, compare, t>::insert_or_assign(const tree_data_type& data)
 {
     return emplace_or_assign(data);
@@ -1640,21 +1621,19 @@ typename BS_tree<tkey, tvalue, compare, t>::bstree_iterator BS_tree<tkey, tvalue
             break;
         }
         if (parent == _root && parent->_pointers.size() == 2) {
-            if (cur_node->_keys.size() < maximum_keys_in_node / 2) {
-                if (cur_node_idx == 0) {
-                    auto* right = parent->_pointers[1];
-                    if (right->_keys.size() > maximum_keys_in_node / 2) {
-                        rotate_left(cur_node, right, parent, 0);
-                    } else {
-                        merge_2to1(cur_node, right, parent, 0);
-                    }
+            if (cur_node_idx == 0) {
+                auto* right = parent->_pointers[1];
+                if (right->_keys.size() > minimum_keys_in_node) {
+                    rotate_left(cur_node, right, parent, 0);
                 } else {
-                    auto* left = parent->_pointers[0];
-                    if (left->_keys.size() > maximum_keys_in_node / 2) {
-                        rotate_right(left, cur_node, parent, 0);
-                    } else {
-                        merge_2to1(left, cur_node, parent, 0);
-                    }
+                    merge_2to1(cur_node, right, parent, 0);
+                }
+            } else {
+                auto* left = parent->_pointers[0];
+                if (left->_keys.size() > minimum_keys_in_node) {
+                    rotate_right(left, cur_node, parent, 0);
+                } else {
+                    merge_2to1(left, cur_node, parent, 0);
                 }
             }
             break;
