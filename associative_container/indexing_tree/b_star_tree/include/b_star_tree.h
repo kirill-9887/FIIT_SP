@@ -1394,8 +1394,11 @@ std::pair<typename BS_tree<tkey, tvalue, compare, t>::bstree_iterator, bool> BS_
         i = r_it._index + 1;
         path = r_it._path;
     } else if (it->first == data.first) {
-        // (*it._path.top().first)->_keys[it._index].second = data.second;
-        return std::make_pair(it, false);
+        if (it->second == data.second) {
+            return std::make_pair(it, false);
+        }
+        (*it._path.top().first)->_keys[it._index].second = data.second;
+        return std::make_pair(it, true);
     } else {
         current_ptr = it._path.top().first;
         if ((*current_ptr)->is_internal()) {
@@ -1768,7 +1771,7 @@ void BS_tree<tkey, tvalue, compare, t>::print_bstree() {
         std::cout << "Tree is empty.\n";
         return;
     }
-    std::cout << "--- B-Tree Structure ---\n";
+    std::cout << "--- BS-Tree Structure ---\n";
     print_recursive(_root, 0);
     std::cout << "------------------------\n";
 }
