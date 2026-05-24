@@ -134,14 +134,14 @@ TEST(bTreePositiveTests, test2)
                     test_data<int, std::string>(1, 2, "b"),
                     test_data<int, std::string>(2, 3, "d"),
                     test_data<int, std::string>(3, 4, "e"),
-                    test_data<int, std::string>(4, 15, "c"),
-                    test_data<int, std::string>(5, 24, "g"),
-                    test_data<int, std::string>(0, 45, "k"),
-                    test_data<int, std::string>(1, 100, "f"),
-                    test_data<int, std::string>(2, 101, "j"),
-                    test_data<int, std::string>(3, 193, "l"),
-                    test_data<int, std::string>(4, 456, "h"),
-                    test_data<int, std::string>(5, 534, "m")
+                    test_data<int, std::string>(0, 15, "c"),
+                    test_data<int, std::string>(1, 24, "g"),
+                    test_data<int, std::string>(2, 45, "k"),
+                    test_data<int, std::string>(3, 100, "f"),
+                    test_data<int, std::string>(4, 101, "j"),
+                    test_data<int, std::string>(5, 193, "l"),
+                    test_data<int, std::string>(6, 456, "h"),
+                    test_data<int, std::string>(7, 534, "m")
             };
 
     BSP_tree<int, std::string, std::less<int>, 3> tree(std::less<int>(), nullptr);
