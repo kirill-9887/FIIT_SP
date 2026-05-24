@@ -1731,9 +1731,9 @@ void BS_tree<tkey, tvalue, compare, t>::merge_3to2(bstree_node* left, bstree_nod
     if (left->is_internal()) {
         auto s1_p = s1 + 1;
         auto s2_p = s2 + 1;
-        auto to_s1 = s1 - left->_pointers.size();
-        left->_pointers.insert(left->_pointers.end(), middle->_pointers.begin(), middle->_pointers.begin() + to_s1);
-        middle->_pointers.erase(middle->_pointers.begin(), middle->_pointers.begin() + to_s1);
+        auto to_s1_p = s1_p - left->_pointers.size();
+        left->_pointers.insert(left->_pointers.end(), middle->_pointers.begin(), middle->_pointers.begin() + to_s1_p);
+        middle->_pointers.erase(middle->_pointers.begin(), middle->_pointers.begin() + to_s1_p);
         middle->_pointers.insert(middle->_pointers.end(), right->_pointers.begin(), right->_pointers.end());
     }
     parent->_keys.erase(parent->_keys.begin() + left_idx + 1);
