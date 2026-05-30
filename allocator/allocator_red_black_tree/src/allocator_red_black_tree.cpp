@@ -383,7 +383,7 @@ void allocator_red_black_tree::insert_in_red_black_tree(free_block_metadata_stru
         while (node && node->right) {
             node = node->right;
         }
-        if (node && block_size(_trusted_memory, node) - occupied_block_metadata_size >= size) {
+        if (node && (block_size(_trusted_memory, node) - occupied_block_metadata_size >= size)) {
             best_node = node;
         }
     }

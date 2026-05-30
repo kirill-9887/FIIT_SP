@@ -97,10 +97,7 @@ allocator_buddies_system::allocator_buddies_system(
     array[idx] = free_block->next;
     while (idx != order) {
         --idx;
-        uintptr_t relative_addr = reinterpret_cast<uintptr_t>(free_block) - reinterpret_cast<uintptr_t>(pool_ptr());
-        uintptr_t buddy_relative_addr = relative_addr ^ (1ULL << idx);
-        void* buddy_address = static_cast<char*>(pool_ptr()) + buddy_relative_addr;
-
+        void* buddy_address = static_cast<char*>(pool_ptr()) + (1ULL << idx);
         auto* new_free_block = reinterpret_cast<struct free_block_metadata*>(buddy_address);
         new_free_block->occupied = false;
         new_free_block->size = idx;
